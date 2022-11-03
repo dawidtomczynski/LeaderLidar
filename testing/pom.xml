@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.lidar</groupId>
+    <artifactId>simulator</artifactId>
+    <version>99-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <artifactory.url>3.67.186.44:8082</artifactory.url>
+    </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>libs-release</name>
+            <url>http://${artifactory.url}/artifactory/libs-release-local</url>
+        </repository>
+        <snapshotRepository>
+            <id>snapshots</id>
+            <name>libs-snapshot</name>
+            <url>http://${artifactory.url}/artifactory/libs-snapshot-local</url>
+            <uniqueVersion>false</uniqueVersion>
+        </snapshotRepository>    
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>artifactory</id>
+            <url>http://${artifactory.url}/artifactory/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>central</id>
+            <url>http://${artifactory.url}/artifactory/libs-release-local/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+        <pluginRepository>
+            <id>snapshots</id>
+            <url>http://${artifactory.url}/artifactory/libs-snapshot-local/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <dependencies>
+        <!-- following dependencies are used for interfaces only -->
+        <!-- currently we are assuming interfaces are never changed, so I don't care about the version -->
+        <dependency>
+            <groupId>com.lidar</groupId>
+            <artifactId>telemetry</artifactId>
+            <version>99-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.lidar</groupId>
+            <artifactId>analytics</artifactId>
+            <version>99-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>
+                                com.lidar.simulation.Simulator
+                            </mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>            
+        </plugins>
+    </build>
+    
+</project>

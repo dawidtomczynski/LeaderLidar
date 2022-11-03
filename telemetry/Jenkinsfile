@@ -1,0 +1,105 @@
+pipeline {
+
+    agent any
+
+    tools {
+        maven 'maven-3.6.2'
+        jdk 'jdk-8'
+    }
+    
+    options {
+		buildDiscarder(logRotator(numToKeepStr: '5'))
+		gitLabConnection gitLabConnection: 'gitlab-dawid'
+	}
+
+    environment {
+        COMMIT_MSG = sh (script: "git log -1 | grep 'e2e'", returnStatus: true)
+    }
+
+    stages {
+        stage('Set Version') {
+            when { expression {env.BRANCH_NAME =~ 'release/*'}}
+            steps {
+                withCredentials([gitUsernamePassword(credentialsId: 'b4b46169-8380-49b1-a54f-1f48558a536b')]) {
+                    sh "git fetch --tags || true"
+                }
+                script {
+                    VERSION = env.BRANCH_NAME.split('\\/')[1]
+                    HIGHEST = sh(script: "git tag -l --sort=version:refname \"${VERSION}.*\" | tail -1", returnStdout: true).trim()
+                    if (HIGHEST.isEmpty()) {
+                        NEW = ".0"
+                        NEW_TAG = VERSION + NEW
+                    } else {
+                        NEW_TAG = HIGHEST.split('\\.')
+                        NEW_TAG[2] = NEW_TAG[2].toInteger() + 1
+                        NEW_TAG = NEW_TAG.join('.')
+                    }
+                    sh """
+                        mvn versions:set -DnewVersion=${NEW_TAG}
+                        mvn versions:commit 
+                    """
+                }
+            }
+        }
+        stage('Compile') {
+            when { expression {env.BRANCH_NAME == 'main' || env.BRANCH_NAME =~ 'release/*' || env.BRANCH_NAME =~ 'feature/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean compile"
+                }
+            }
+        }
+        stage('Unit Tests') {
+            when { expression {env.BRANCH_NAME == 'main' || env.BRANCH_NAME =~ 'release/*' || env.BRANCH_NAME =~ 'feature/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean test"
+                }
+            }
+        }
+        stage('Build') {
+            when { expression {env.BRANCH_NAME == 'main' || env.BRANCH_NAME =~ 'release/*' || env.BRANCH_NAME =~ 'feature/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean package"
+                }
+            }
+        }
+        stage('E2E Tests') {
+            when { expression {env.BRANCH_NAME == 'main' || (env.BRANCH_NAME =~ 'feature/*' && env.COMMIT_MSG == '0')}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS dependency:get -Dartifact=com.lidar:simulator:LATEST:jar -Ddest=simulator.jar"
+                    sh "mvn -s $MAVEN_SETTINGS dependency:get -Dartifact=com.lidar:analytics:LATEST:jar -Ddest=analytics.jar"
+                }
+            sh "cp ./target/*.jar telemetry.jar"
+            sh "java -cp telemetry.jar:analytics.jar:simulator.jar com.lidar.simulation.Simulator"
+            }
+        }
+        stage('Deploy') {
+            when { expression {env.BRANCH_NAME == 'main' || env.BRANCH_NAME =~ 'release/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean deploy -DskipTests"
+                }
+            }
+        }
+        stage('Tag') {
+            when { expression {env.BRANCH_NAME =~ 'release/*'}}
+            steps {
+                withCredentials([gitUsernamePassword(credentialsId: 'b4b46169-8380-49b1-a54f-1f48558a536b')]) {
+                    sh """
+                        git clean -f
+                        git tag ${NEW_TAG}
+                        git push --tags
+                    """
+                }
+            }
+        }
+    }
+    post {
+        cleanup {
+            cleanWs()
+        }
+    }
+}

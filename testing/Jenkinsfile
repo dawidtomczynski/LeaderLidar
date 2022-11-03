@@ -1,0 +1,61 @@
+pipeline {
+
+    agent any
+
+    tools {
+        maven 'maven-3.6.2'
+        jdk 'jdk-8'
+    }
+    
+    options {
+		buildDiscarder(logRotator(numToKeepStr: '5'))
+		gitLabConnection gitLabConnection: 'gitlab-dawid'
+	}
+
+    stages {
+        stage('Compile') {
+            when { expression {env.BRANCH_NAME =~ 'main/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean compile"
+                }
+            }
+        }
+        stage('Unit Tests') {
+            when { expression {env.BRANCH_NAME =~ 'main/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean test"
+                }
+            }
+        }
+        stage('Build') {
+            when { expression {env.BRANCH_NAME =~ 'main/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean package"
+                }
+            }
+        }
+        stage('E2E Tests') {
+            when { expression {env.BRANCH_NAME =~ 'main/*'}}
+            steps {
+                echo 'e2e tests'
+            }
+        }
+        stage('Deploy') {
+            when { expression {env.BRANCH_NAME =~ 'main/*'}}
+            steps {
+                configFileProvider([configFile(fileId: '88e3cc91-012c-4957-92fa-036e2767f294', variable: 'MAVEN_SETTINGS')]) {
+                    sh "mvn -s $MAVEN_SETTINGS clean deploy -DskipTests"
+                }
+            }
+        }
+    }
+    post {
+        cleanup {
+            cleanWs()
+        }
+    }
+}
+
